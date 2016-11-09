@@ -9,4 +9,7 @@ For `filename`, include the path if the file is not in the current directory (wi
 
 Typing `thinit.py help` will bring up a brief help screen.
 
+Sample output:
 
+![screen shot]
+(https://github.com/freginold/thinIt/blob/master/ss_thinIt_v1_0_0.png)
