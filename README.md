@@ -1,5 +1,5 @@
 # thinIt
-thinIt is a very basic JavaScript/CSS minifier written in Python 2.7.12.
+thinIt is a basic JavaScript/CSS minifier written in Python.
 
 ## Syntax:
 
@@ -9,7 +9,11 @@ For `filename`, include the path if the file is not in the current directory (wi
 
 Typing `thinit.py help` will bring up a brief help screen.
 
-Sample output:
+## Requirements:
+
+- Python 2.7.x
+
+##
 
 ![screen shot]
 (https://github.com/freginold/thinIt/blob/master/ss_thinIt_v1_0_0.png)
