@@ -4,7 +4,7 @@
 
 # ------------ Setup ------------------
 
-import os, sys
+import os, sys, re
 
 fileName = ""
 jsTextArray = []
@@ -12,12 +12,14 @@ jsText = ""
 jsMinName = ""
 fileType = ""
 commentsOpen = False
+madeAChange = True
 comment = ""
 syntax = '> thinIt.py [fileName] ["optionalCommentText"]'
 ver = "v0.1.0"
-sizeBefore = ""
-sizeAfter = ""
-
+sizeBefore = 0
+sizeAfter = 0
+percentSmaller = 0
+alphanumerics = re.compile('[A-Za-z0-9]+')
 
 # ------------ Functions ------------------
 
@@ -74,56 +76,180 @@ def saveMinFile():
     outputFile.close()
 
 def checkForCommentEnd(line):
-    global madeAChange, partialLine, jsTextArray, commentsOpen
+    global madeAChange, jsTextArray, commentsOpen
+    print jsTextArray[line], ".", commentsOpen, "."     ### take this out ###
     for j in range(0, len(jsTextArray[line])):
         # loop through line, if see "*/" anywhere, end of comments
         if jsTextArray[line][j:j+2] == "*/":
-            commentsOpen = False
             madeAChange = True
-            partialLine = True
+            commentsOpen = False
             jsTextArray[line] = jsTextArray[line][j+2:]
+            print jsTextArray[line], commentsOpen
             break
     if commentsOpen:
+        print jsTextArray[line], "-- DELETING THIS"
         jsTextArray[line] = ""
+
+def removeLeadingSpace(thisLine):
+    # check for & remove leading space
+    global madeAChange
+    if thisLine[0:1] == " ":
+        madeAChange = True
+        return thisLine[1:]
+    else:
+        return thisLine
+
+def removeTrailingSpace(thisLine):
+    # check for & remove trailing space
+    global madeAChange
+    if thisLine[len(thisLine)-1:len(thisLine)] == " ":
+        madeAChange = True
+        return thisLine[:(len(thisLine)-1)]
+    else:
+        return thisLine
+
+def removeLeadingTab(thisLine):
+    # check for & remove leading tab
+    global madeAChange
+    if thisLine[0:1] == chr(9):
+        madeAChange = True
+        return thisLine[1:]
+    else:
+        return thisLine
+
+def removeTrailingTab(thisLine):
+    # check for & remove trailing tab
+    global madeAChange
+    if thisLine[len(thisLine)-1:len(thisLine)] == chr(9):
+        madeAChange = True
+        return thisLine[:(len(thisLine)-1)]
+    else:
+        return thisLine
+
+def removeIndentedComment(thisLine):
+    # check for indented Python comments & remove them
+    # this function has to be called after checking for 1st char comment, otherwise those will be skipped
+    returnLine = ""
+    for j in range(0, len(thisLine)):
+        # loop through line, if see "#" after just spaces or tabs, remove the line
+        if thisLine[j:j+1] == " " or thisLine[j:j+1] == chr(9):
+            # if char is a space or tab, keep checking
+            if thisLine[j+1:j+2] == "#":
+                # if found a comment
+                returnLine = ""
+                break
+            else:
+                continue
+        else:
+            # if not a space or tab, skip this line
+            returnLine = thisLine
+            break
+    return returnLine
+
+def removeInternalSpaces(thisLine):
+    # remove spaces between non-alphanumeric characters; *** for JS, check to be sure not in quotes first
+    global madeAChange
+    if len(thisLine) < 3:
+        return thisLine
+    newLine = thisLine[0]
+    for j in range(1, len(thisLine)-1):
+        # loop through line, remove unnecessary spaces
+        if thisLine[j] == " ":
+            if (alphanumerics.search(thisLine[j-1])) and (alphanumerics.search(thisLine[j+1])):
+                # if characters on both sides of space are alphanumeric, keep the space
+                newLine = newLine + thisLine[j]
+            else:
+                # else, skip the space
+                madeAChange = True
+                continue
+        else:
+            newLine = newLine + thisLine[j]
+    newLine = newLine + thisLine[len(thisLine)-1]
+    return newLine
+
+def condenseLines(num):
+    # for lines that don't end w/ a letter or number, check next non-blank char to be sure not alphanumeric; if not, consolidate the lines
+    # for: JS, CSS
+    global jsText
+
+    # for making output string, loop through chars & lines after current EOL & make sure that next non-blank char is not alphanumeric
+    # for loop to end of array, when find an alpha, break
+    foundAlpha = False
+    for j in range(num, len(jsTextArray)-1):
+        # loop through rest of the lines until find a non-blank character
+        for k in range(0, len(jsTextArray[j-1])):
+            # loop through chars in current line
+            #if jsTextArray
+            pass
     
+    jsText = jsText + jsTextArray[num] + " "
+    # print "1 or BOTH NOT ALPHA: " + jsTextArray[num][len(jsTextArray[num])-1], jsTextArray[num+1][0:5], jsTextArray[num+2], alphanumerics.search(jsTextArray[num+1][0:1])
+    ##### problem with this regexp w/ JS files (jquery) ------- problem is w/ line(s) ending in "r"
+    ##### remove " " from above once figure it out
+    #### idea: search through rest of lines until come to a non-blank char, make sure it's not alphanumeric
+
 def loopThrough():
-    global commentsOpen
-    madeAChange = True
-    partialLine = False
+    global commentsOpen, madeAChange, fileType
     while madeAChange:
         madeAChange = False
         for i in range(0, len(jsTextArray)):
+            # loop through the lines in the file
+            if jsTextArray[i] == chr(13) or jsTextArray[i] == chr(10) or jsTextArray[i] == "":
+                # if an empty line, skip it
+                jsTextArray[i] = ""
+                continue
             if commentsOpen:
+                # if currently in a comment that could be multi-line
                 checkForCommentEnd(i)
             else:
-                if jsTextArray[i][0:2] == "//":
+                # if not currently in a comment, check for beginning of a comment
+                if jsTextArray[i][0:2] == "//" and fileType == "js":
                     madeAChange = True
                     jsTextArray[i] = ""
-                if jsTextArray[i][0:2] == "/*":
+                    continue
+                if jsTextArray[i][0:1] == "#" and fileType[0:2] == "py":
+                    madeAChange = True
+                    jsTextArray[i] = ""
+                    continue
+                if jsTextArray[i][0:1] == "'" and fileType[0:2] == "vb":
+                    madeAChange = True
+                    jsTextArray[i] = ""
+                    continue
+                if jsTextArray[i][0:2] == "/*" and (fileType == "js" or fileType == "css"):
                     madeAChange = True
                     commentsOpen = True
                     checkForCommentEnd(i)
                     continue
-                if jsTextArray[i][0:1] == " ":
-                    # if first char is space, delete it
-                    madeAChange = True
-                    partialLine = True
-                    jsTextArray[i] = jsTextArray[i][1:]
-                if jsTextArray[i][len(jsTextArray[i])-1:len(jsTextArray[i])] == " ":
-                    # remove trailing spaces
-                    jsTextArray[i] = jsTextArray[i][:(len(jsTextArray[i])-1)]
+
+                jsTextArray[i] = removeTrailingSpace(jsTextArray[i])
+                jsTextArray[i] = removeTrailingTab(jsTextArray[i])
+                
+                # language-specific checks
+                if fileType == "js":
+                    jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
+                    jsTextArray[i] = removeLeadingTab(jsTextArray[i])
+                if fileType == "css":
+                    jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
+                    jsTextArray[i] = removeLeadingTab(jsTextArray[i])
+                    jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+                if fileType[0:2] == "py":
+                    jsTextArray[i] = removeIndentedComment(jsTextArray[i])
+                if fileType[0:2] == "vb":
+                    jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
+                    jsTextArray[i] = removeLeadingTab(jsTextArray[i])
                     
-                # check if partialLine flag is set
-                if partialLine:
-                    partialLine = False
 
 def makeOutputString():
     # copy minified text into string
-    global jsText, comment
+    global jsText, comment, fileType
     if comment <> "":
         # if a comment will be added
         if fileType == "js":
             comment = "// " + comment
+        if fileType[0:2] == "py":
+            comment = "#" + comment
+        if fileType[0:2] == "vb":
+            comment = "'" + comment
         else:
             comment = "/* " + comment + " */"
         jsText = comment + "\n"
@@ -132,10 +258,26 @@ def makeOutputString():
         if jsTextArray[i] == "":
             continue
         else:
-            if jsTextArray[i][len(jsTextArray[i])-1] == ";":
-                jsText = jsText + jsTextArray[i]
-            else:
-                jsText = jsText + jsTextArray[i] + "\n"
+            if (fileType == "js" or fileType == "css") and (i < len(jsTextArray)-1):
+                # if a JS/CSS file and not at the last line
+                if (alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1])) and (alphanumerics.search(jsTextArray[i+1][0:1])):
+                    # if both are alphanumeric, don't consolidate the lines
+                    jsText = jsText + jsTextArray[i] + "\n"
+                else:
+                    if alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1]):
+                        # if last char is alphanumeric but 1st char on next line isn't:
+                        condenseLines(i)
+                    else:
+                        # if neither are alphanumeric
+                        jsText = jsText + jsTextArray[i]
+
+def getSizes():
+    global sizeBefore, sizeAfter, percentSmaller
+    sizeBefore = os.stat(fileName).st_size
+    sizeAfter = os.stat(jsMinName).st_size
+    percentSmaller = int(100 - ((sizeAfter * 1.00) / sizeBefore * 100))
+    sizeBefore = "%s %s" % (sizeBefore, "bytes")
+    sizeAfter = "%s %s" % (sizeAfter, "bytes")
 
 def showResults():
     # show before & after file size, new file name
@@ -155,6 +297,7 @@ getParams()
 jsFile = open(fileName, "r")
 jsTextArray = jsFile.read().split('\n')
 fileType = getFileType()
+
 getMinName()
 jsFile.close()
 
@@ -164,10 +307,6 @@ makeOutputString()
 
 saveMinFile()
 
-sizeBefore = os.stat(fileName).st_size
-sizeAfter = os.stat(jsMinName).st_size
-percentSmaller = int(100 - ((sizeAfter * 1.00) / sizeBefore * 100))
-sizeBefore = "%s %s" % (sizeBefore, "bytes")
-sizeAfter = "%s %s" % (sizeAfter, "bytes")
+getSizes()
 
 showResults()
