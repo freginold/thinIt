@@ -1,5 +1,5 @@
-Version:
+Version: 
 
-Type of file trying to minify (i.e. JS, CSS, etc.):
+Type of file trying to minify (i.e. JS, CSS, etc.): 
 
-Issue:
+Issue: 
