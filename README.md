@@ -18,4 +18,4 @@ Typing `thinit.py help` will bring up a brief help screen.
 ![screen shot]
 (https://github.com/freginold/thinIt/blob/master/ss_thinIt_v1_0_0.png)
 
-thinIt is versioned using [semantic versioning] (http://semver.org/).
+thinIt is versioned using [Semantic Versioning] (http://semver.org/).
