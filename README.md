@@ -9,6 +9,8 @@ For `filename`, include the path if the file is not in the current directory (wi
 
 Typing `thinit.py help` will bring up a brief help screen.
 
+thinIt has rudimentary support for Python (.py\*) and VBScript (.vb\*) files as well.  For Python it removes blank lines and lines that begin with a comment, and for VBScript it removes blank lines, lines that begin with a comment, and indentations.  Support for Python docstring comments will be coming in a future version.
+
 ## Requirements:
 
 - Python 2.7.x
