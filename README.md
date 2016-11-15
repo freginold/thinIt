@@ -1,5 +1,5 @@
 # thinIt
-thinIt is a basic JavaScript/CSS minifier written in Python.
+thinIt is a basic JavaScript (.js) / CSS (.css)  minifier written in Python.
 
 ## Syntax:
 
