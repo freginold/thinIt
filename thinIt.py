@@ -19,7 +19,7 @@ ver = "v0.1.0"
 sizeBefore = 0
 sizeAfter = 0
 percentSmaller = 0
-alphanumerics = re.compile('[A-Za-z0-9]+')
+alphanumerics = re.compile('[A-Za-z0-9_\.$]+')
 
 # ------------ Functions ------------------
 
@@ -75,20 +75,18 @@ def saveMinFile():
     outputFile.write(jsText)
     outputFile.close()
 
-def checkForCommentEnd(line):
+def checkForCommentEnd(thisLine):
     global madeAChange, jsTextArray, commentsOpen
-    print jsTextArray[line], ".", commentsOpen, "."     ### take this out ###
-    for j in range(0, len(jsTextArray[line])):
+    for j in range(0, len(thisLine)):
         # loop through line, if see "*/" anywhere, end of comments
-        if jsTextArray[line][j:j+2] == "*/":
+        if thisLine[j:j+2] == "*/":
             madeAChange = True
             commentsOpen = False
-            jsTextArray[line] = jsTextArray[line][j+2:]
-            print jsTextArray[line], commentsOpen
+            thisLine = thisLine[j+2:]
             break
     if commentsOpen:
-        print jsTextArray[line], "-- DELETING THIS"
-        jsTextArray[line] = ""
+        thisLine = ""
+    return thisLine
 
 def removeLeadingSpace(thisLine):
     # check for & remove leading space
@@ -167,31 +165,71 @@ def removeInternalSpaces(thisLine):
     newLine = newLine + thisLine[len(thisLine)-1]
     return newLine
 
+def removeInternalJSComments(line):
+    # remove /* */ comments that may not be at the beginning of the line
+    global madeAChange, commentsOpen
+    for j in range(0, len(jsTextArray[line]) - 1):
+        # loop through line to see if see /*
+        if jsTextArray[line][j:j+2] == "/*":
+            commentsOpen = True
+            madeAChange = True            
+            # call checkforcommentend with string from j onward; if it returns empty string (no comment end) delete line from j onward; else concatenate
+            # beginning up to j, plus part that was returned
+            tempString = checkForCommentEnd(jsTextArray[line])
+            if tempString == "":
+                # no comment end
+                return jsTextArray[line][0:j]
+            else:
+                # if found comment end
+                return jsTextArray[line][0:j] + tempString
+    return jsTextArray[line]
+
 def condenseLines(num):
     # for lines that don't end w/ a letter or number, check next non-blank char to be sure not alphanumeric; if not, consolidate the lines
     # for: JS, CSS
     global jsText
-
     # for making output string, loop through chars & lines after current EOL & make sure that next non-blank char is not alphanumeric
-    # for loop to end of array, when find an alpha, break
-    foundAlpha = False
-    for j in range(num, len(jsTextArray)-1):
+    doneChecking = False
+    for j in range(num + 1, len(jsTextArray)-1):
         # loop through rest of the lines until find a non-blank character
-        for k in range(0, len(jsTextArray[j-1])):
-            # loop through chars in current line
-            #if jsTextArray
-            pass
-    
-    jsText = jsText + jsTextArray[num] + " "
-    # print "1 or BOTH NOT ALPHA: " + jsTextArray[num][len(jsTextArray[num])-1], jsTextArray[num+1][0:5], jsTextArray[num+2], alphanumerics.search(jsTextArray[num+1][0:1])
-    ##### problem with this regexp w/ JS files (jquery) ------- problem is w/ line(s) ending in "r"
-    ##### remove " " from above once figure it out
-    #### idea: search through rest of lines until come to a non-blank char, make sure it's not alphanumeric
+        for k in range(0, len(jsTextArray[j])-1):
+            if jsTextArray[j][k] == "" or jsTextArray[j][k] == " " or jsTextArray[j][k] == chr(10) or jsTextArray[j][k] == chr(13):
+                # if a space or line end
+                continue
+            elif alphanumerics.search(jsTextArray[j][k]):
+                # if it's an alphanumeric character
+                jsText = jsText + jsTextArray[num] + " "
+                doneChecking = True
+                break
+            else:
+                # if not alphanumeric character
+                jsText = jsText + jsTextArray[num]
+                doneChecking = True
+                break
+        if doneChecking:
+            break
+    if not doneChecking:
+        jsText = jsText + jsTextArray[num]
+
+def checkForInternalSingleComment(thisLine):
+    # check for single-line comment somewhere in line other than at beginning
+    # use fileType to determine if looking for // or #
+    # ** if changing to do this in the while function, have to check to be sure not in quotes first **
+    for k in range(0, len(thisLine)):
+        # loop through line looking for comment start
+        if fileType[0:2] == "py":
+            if thisLine[k] == "#":
+                return True
+        if fileType == "js":
+            if thisLine[k:k+2] == "//":
+                return True
+    return False
 
 def loopThrough():
     global commentsOpen, madeAChange, fileType
     while madeAChange:
         madeAChange = False
+        commentsOpen = False
         for i in range(0, len(jsTextArray)):
             # loop through the lines in the file
             if jsTextArray[i] == chr(13) or jsTextArray[i] == chr(10) or jsTextArray[i] == "":
@@ -200,7 +238,7 @@ def loopThrough():
                 continue
             if commentsOpen:
                 # if currently in a comment that could be multi-line
-                checkForCommentEnd(i)
+                jsTextArray[i] = checkForCommentEnd(jsTextArray[i])
             else:
                 # if not currently in a comment, check for beginning of a comment
                 if jsTextArray[i][0:2] == "//" and fileType == "js":
@@ -218,7 +256,7 @@ def loopThrough():
                 if jsTextArray[i][0:2] == "/*" and (fileType == "js" or fileType == "css"):
                     madeAChange = True
                     commentsOpen = True
-                    checkForCommentEnd(i)
+                    jsTextArray[i] = checkForCommentEnd(jsTextArray[i])
                     continue
 
                 jsTextArray[i] = removeTrailingSpace(jsTextArray[i])
@@ -228,19 +266,23 @@ def loopThrough():
                 if fileType == "js":
                     jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
                     jsTextArray[i] = removeLeadingTab(jsTextArray[i])
+                    jsTextArray[i] = removeInternalJSComments(i);
+                    #jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+                    # --- check to be sure not in quotes first
                 if fileType == "css":
                     jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
                     jsTextArray[i] = removeLeadingTab(jsTextArray[i])
+                    jsTextArray[i] = removeInternalJSComments(i);
                     jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
                 if fileType[0:2] == "py":
                     jsTextArray[i] = removeIndentedComment(jsTextArray[i])
                 if fileType[0:2] == "vb":
                     jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
                     jsTextArray[i] = removeLeadingTab(jsTextArray[i])
-                    
 
-def makeOutputString():
+def makeOutputString():    
     # copy minified text into string
+    # if do away with this function for performance reasons, just write array to file with "\n", " ", or nothing between lines
     global jsText, comment, fileType
     if comment <> "":
         # if a comment will be added
@@ -258,18 +300,32 @@ def makeOutputString():
         if jsTextArray[i] == "":
             continue
         else:
-            if (fileType == "js" or fileType == "css") and (i < len(jsTextArray)-1):
-                # if a JS/CSS file and not at the last line
-                if (alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1])) and (alphanumerics.search(jsTextArray[i+1][0:1])):
-                    # if both are alphanumeric, don't consolidate the lines
-                    jsText = jsText + jsTextArray[i] + "\n"
-                else:
-                    if alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1]):
-                        # if last char is alphanumeric but 1st char on next line isn't:
-                        condenseLines(i)
+            if (fileType == "js" or fileType == "css"):
+                # if a JS/CSS file
+                if i < len(jsTextArray)-1:
+                    # if not the last line
+                    if (alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1])) and (alphanumerics.search(jsTextArray[i+1][0:1])):
+                        # if both are alphanumeric, don't consolidate the lines
+                        if checkForInternalSingleComment(jsTextArray[i]):
+                            jsText = jsText + jsTextArray[i] + "\n"
+                        else:
+                            jsText = jsText + jsTextArray[i] + " "
                     else:
-                        # if neither are alphanumeric
-                        jsText = jsText + jsTextArray[i]
+                        if alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1]):
+                            # if last char is alphanumeric but 1st char on next line isn't:
+                            if checkForInternalSingleComment(jsTextArray[i]):
+                                jsText = jsText + jsTextArray[i] + "\n"
+                            else:
+                                condenseLines(i)
+                        else:
+                            # if neither are alphanumeric
+                            jsText = jsText + jsTextArray[i]
+                else:
+                    # if the last line
+                    jsText = jsText + jsTextArray[len(jsTextArray)-1]
+            else:
+                # for other file types
+                jsText = jsText + jsTextArray[i] + "\n"
 
 def getSizes():
     global sizeBefore, sizeAfter, percentSmaller
