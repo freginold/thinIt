@@ -12,6 +12,8 @@ jsText = ""
 jsMinName = ""
 fileType = ""
 commentsOpen = False
+singleQuoteOpen = False
+doubleQuoteOpen = False
 madeAChange = True
 comment = ""
 syntax = '> thinIt.py [fileName] ["optionalCommentText"]'
@@ -124,15 +126,15 @@ def removeTrailingTab(thisLine):
     else:
         return thisLine
 
-def removeIndentedComment(thisLine):
-    # check for indented Python comments & remove them
+def removeIndentedComment(thisLine, commentChar):
+    # check for indented Python/VBScript comments & remove them
     # this function has to be called after checking for 1st char comment, otherwise those will be skipped
     returnLine = ""
     for j in range(0, len(thisLine)):
         # loop through line, if see "#" after just spaces or tabs, remove the line
         if thisLine[j:j+1] == " " or thisLine[j:j+1] == chr(9):
             # if char is a space or tab, keep checking
-            if thisLine[j+1:j+2] == "#":
+            if thisLine[j+1:j+2] == commentChar:
                 # if found a comment
                 returnLine = ""
                 break
@@ -145,7 +147,7 @@ def removeIndentedComment(thisLine):
     return returnLine
 
 def removeInternalSpaces(thisLine):
-    # remove spaces between non-alphanumeric characters; *** for JS, check to be sure not in quotes first
+    # remove spaces between non-alphanumeric characters; *** for JS, check to be sure not in quotes first; for HTML, check to be sure not a <pre> tag
     global madeAChange
     if len(thisLine) < 3:
         return thisLine
@@ -213,8 +215,8 @@ def condenseLines(num):
 
 def checkForInternalSingleComment(thisLine):
     # check for single-line comment somewhere in line other than at beginning
-    # use fileType to determine if looking for // or #
-    # ** if changing to do this in the while function, have to check to be sure not in quotes first **
+    # use fileType to determine if looking for // or # or '
+    # ** if changing to do this in the while function, have to check to be sure not in quotes (or escaped) first **
     for k in range(0, len(thisLine)):
         # loop through line looking for comment start
         if fileType[0:2] == "py":
@@ -223,7 +225,47 @@ def checkForInternalSingleComment(thisLine):
         if fileType == "js":
             if thisLine[k:k+2] == "//":
                 return True
+        if fileType[0:2] == "vb":
+            if thisLine[k] == "'":
+                return True
     return False
+
+def checkForQuotes(thisLine):
+    # loop through line, check for single or double opening quote (except VBScript file -- only check for double quotes)
+    global madeAChange, singleQuoteOpen, doubleQuoteOpen
+    for j in range(0, len(thisLine)):
+        if thisLine[j] == "\"":
+            # *** have to have separate check for closing quotes -- when to do that? ***
+            pass
+
+def checkforEOLChar(num, eol):
+    # check line for that language's EOL character; if found, remove it and concatenate that line and the next one
+    # by saving them both as the i+1 line (so they get checked next time through, and not skipped)
+    # for JS and Python: \
+    # for VBScript: _
+    # --- use chr() instead of escaping backslash ---
+    pass
+
+def concatHTMLHead():
+    global jsText
+    # remove line breaks from all tags before the <body> tag
+    for i in range(0, len(jsTextArray) - 1):
+        # search that line for <body -- if found, concatenate all prior lines
+        if "<body" in jsTextArray[i]:
+            break
+        # if not at body yet, remove internal spaces
+        jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+    # loop back through prior lines, concatenate them
+    for j in range(0, i - 1):
+        if len(jsTextArray[j]) > 1:
+            lastChar = jsTextArray[j][len(jsTextArray[j]) - 1]      # **** make this into a concatHTMLLines function, call it here & from outputstring func, check for <pre> tags
+        else:
+            lastChar = jsTextArray[j][0:1]
+        if lastChar == ">" or lastChar == " " or lastChar == "<":
+            jsText = jsText + jsTextArray[j]
+        else:
+            jsText = jsText + jsTextArray[j] + " "
+    return i    
 
 def loopThrough():
     global commentsOpen, madeAChange, fileType
@@ -266,7 +308,9 @@ def loopThrough():
                 if fileType == "js":
                     jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
                     jsTextArray[i] = removeLeadingTab(jsTextArray[i])
-                    jsTextArray[i] = removeInternalJSComments(i);
+                    jsTextArray[i] = removeInternalJSComments(i)
+                    checkforEOLChar(i, "\\")
+                    #checkForQuotes(jsTextArray[i])
                     #jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
                     # --- check to be sure not in quotes first
                 if fileType == "css":
@@ -274,13 +318,26 @@ def loopThrough():
                     jsTextArray[i] = removeLeadingTab(jsTextArray[i])
                     jsTextArray[i] = removeInternalJSComments(i);
                     jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+                    # --- check to be sure not in quotes first                    
                 if fileType[0:2] == "py":
-                    jsTextArray[i] = removeIndentedComment(jsTextArray[i])
+                    jsTextArray[i] = removeIndentedComment(jsTextArray[i], "#")
+                    checkforEOLChar(i, "\\")
+                    #jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+                    # --- check to be sure not in quotes first
                 if fileType[0:2] == "vb":
+                    jsTextArray[i] = removeIndentedComment(jsTextArray[i], "'")
                     jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
                     jsTextArray[i] = removeLeadingTab(jsTextArray[i])
+                    checkforEOLChar(i, "_")
+                    #jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+                    # --- check to be sure not in quotes first                    
+                if fileType[0:2] == "ht":
+                    jsTextArray[i] = removeLeadingSpace(jsTextArray[i])
+                    jsTextArray[i] = removeLeadingTab(jsTextArray[i])
+                    #jsTextArray[i] = removeInternalSpaces(jsTextArray[i])
+                    # --- check to be sure not in <pre> tag first, can run it for everything inside < >
 
-def makeOutputString():    
+def makeOutputString():
     # copy minified text into string
     # if do away with this function for performance reasons, just write array to file with "\n", " ", or nothing between lines
     global jsText, comment, fileType
@@ -295,6 +352,9 @@ def makeOutputString():
         else:
             comment = "/* " + comment + " */"
         jsText = comment + "\n"
+    if fileType[0:2] == "ht":
+        # if HTML or HTA file, check to see where <body> starts; concatenate everything before that
+        bodyStart = concatHTMLHead()
     for i in range(0, len(jsTextArray)):
         # put new lines into a string. if ; at end, don't add \n
         if jsTextArray[i] == "":
@@ -306,7 +366,7 @@ def makeOutputString():
                     # if not the last line
                     if (alphanumerics.search(jsTextArray[i][len(jsTextArray[i])-1])) and (alphanumerics.search(jsTextArray[i+1][0:1])):
                         # if both are alphanumeric, don't consolidate the lines
-                        if checkForInternalSingleComment(jsTextArray[i]):
+                        if checkForInternalSingleComment(jsTextArray[i]):   # this is just until can remove the comments?
                             jsText = jsText + jsTextArray[i] + "\n"
                         else:
                             jsText = jsText + jsTextArray[i] + " "
@@ -325,6 +385,11 @@ def makeOutputString():
                     jsText = jsText + jsTextArray[len(jsTextArray)-1]
             else:
                 # for other file types
+                if fileType[0:2] == "ht":
+                    # if HTML / HTA
+                    if (i < bodyStart):
+                        # if not at the <body> tag yet
+                            continue;
                 jsText = jsText + jsTextArray[i] + "\n"
 
 def getSizes():
