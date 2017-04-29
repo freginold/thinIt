@@ -19,4 +19,4 @@ thinIt has rudimentary support for Python (.py\*) and VBScript (.vb\*) files as 
 
 ![screen shot](https://github.com/freginold/thinIt/blob/master/ss_thinIt_v1_0_0.png)
 
-thinIt is versioned using [Semantic Versioning] (http://semver.org/).
+thinIt is versioned using [Semantic Versioning](http://semver.org/).
