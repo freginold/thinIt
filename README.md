@@ -5,7 +5,12 @@ thinIt is a basic JavaScript (.js) / CSS (.css)  minifier written in Python.
 
 `thinit.py [filename] ["optional comment text"]`
 
-For `filename`, include the path if the file is not in the current directory (with quotes, if there are spaces).  `optional comment text` is used if you want to insert a comment as the first line of the minified file, for example to include the file name, version number, date, brief description, etc.
+- `filename` -- Name of the file to minify. Include the file path if not in the current directory (with quotes, if there are spaces).
+- `"optional comment text"` -- If you want to insert a comment at the beginning of the minified file (to reference the version number, date, etc.) include it here, in quotes.
+
+*Example:*
+
+`thinit.py test.js "Test file v1.0"`
 
 Typing `thinit.py help` will bring up a brief help screen.
 
